@@ -7,6 +7,7 @@ GMS is a benchmarking suite for graph mining that facilitates evaluating and con
 This public repo will only contain main releases. We will not actively push updates.
 
 The GMS website: https://graphminesuite.netlify.app/
+
 The GMS docs: https://graphminesuite.netlify.app/docs/
 
 GMS isfeatured in PVLDB vol 14; if you use GMS, cite us:
