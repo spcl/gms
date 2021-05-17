@@ -1,0 +1,3 @@
+add_subdirectory(coloring)
+add_subdirectory(k_clique_list)
+add_subdirectory(subgraphiso)

@@ -1,0 +1,195 @@
+// Copyright (c) 2015, The Regents of the University of California (Regents)
+// See LICENSE.txt for license details
+
+#include <cinttypes>
+#include <limits>
+#include <iostream>
+#include <queue>
+#include <vector>
+
+#include <gms/third_party/gapbs/benchmark.h>
+#include <gms/third_party/gapbs/builder.h>
+#include <gms/third_party/gapbs/command_line.h>
+#include <gms/third_party/gapbs/graph.h>
+#include <gms/third_party/gapbs/platform_atomics.h>
+#include <gms/third_party/gapbs/pvector.h>
+#include <gms/third_party/gapbs/timer.h>
+
+
+/*
+GAP Benchmark Suite
+Kernel: Single-source Shortest Paths (SSSP)
+Author: Scott Beamer
+
+Returns array of distances for all vertices from given source vertex
+
+This SSSP implementation makes use of the ∆-stepping algorithm [1]. The type
+used for weights and distances (WeightT) is typedefined in benchmark.h. The
+delta parameter (-d) should be set for each input graph.
+
+The bins of width delta are actually all thread-local and of type std::vector
+so they can grow but are otherwise capacity-proportional. Each iteration is
+done in two phases separated by barriers. In the first phase, the current
+shared bin is processed by all threads. As they find vertices whose distance
+they are able to improve, they add them to their thread-local bins. During this
+phase, each thread also votes on what the next bin should be (smallest
+non-empty bin). In the next phase, each thread copies their selected
+thread-local bin into the shared bin.
+
+Once a vertex is added to a bin, it is not removed, even if its distance is
+later updated and it now appears in a lower bin. We find ignoring vertices if
+their current distance is less than the min distance for the bin to remove
+enough redundant work that this is faster than removing the vertex from older
+bins.
+
+[1] Ulrich Meyer and Peter Sanders. "δ-stepping: a parallelizable shortest path
+    algorithm." Journal of Algorithms, 49(1):114–152, 2003.
+*/
+
+
+using namespace std;
+
+const WeightT kDistInf = numeric_limits<WeightT>::max()/2;
+
+pvector<WeightT> DeltaStep(const My_Weighted_Graph &g, NodeId source, WeightT delta) {
+  Timer t;
+  pvector<WeightT> dist(g.num_nodes(), kDistInf);
+  dist[source] = 0;
+  pvector<NodeId> frontier(g.num_edges_directed());
+  // two element arrays for double buffering curr=iter&1, next=(iter+1)&1
+  size_t shared_indexes[2] = {0, kDistInf};
+  size_t frontier_tails[2] = {1, 0};
+  frontier[0] = source;
+  t.Start();
+  #pragma omp parallel
+  {
+    vector<vector<NodeId> > local_bins(0);
+    size_t iter = 0;
+    while (static_cast<WeightT>(shared_indexes[iter&1]) != kDistInf) {
+      size_t &curr_bin_index = shared_indexes[iter&1];
+      size_t &next_bin_index = shared_indexes[(iter+1)&1];
+      size_t &curr_frontier_tail = frontier_tails[iter&1];
+      size_t &next_frontier_tail = frontier_tails[(iter+1)&1];
+      #pragma omp for nowait schedule(dynamic, 64)
+      for (size_t i=0; i < curr_frontier_tail; i++) {
+        NodeId u = frontier[i];
+        if (dist[u] >= delta * static_cast<WeightT>(curr_bin_index)) {
+          for (Neighbour wn : g.out_neigh(u)) {
+            WeightT old_dist = dist[wn.id];
+            WeightT new_dist = dist[u] + wn.weight;
+            if (new_dist < old_dist) {
+              bool changed_dist = true;
+              while (!compare_and_swap(dist[wn.id], old_dist, new_dist)) {
+                old_dist = dist[wn.id];
+                if (old_dist <= new_dist) {
+                  changed_dist = false;
+                  break;
+                }
+              }
+              if (changed_dist) {
+                size_t dest_bin = new_dist/delta;
+                if (dest_bin >= local_bins.size()) {
+                  local_bins.resize(dest_bin+1);
+                }
+                local_bins[dest_bin].push_back(wn.id);
+              }
+            }
+          }
+        }
+      }
+      for (size_t i=curr_bin_index; i < local_bins.size(); i++) {
+        if (!local_bins[i].empty()) {
+          #pragma omp critical
+          next_bin_index = min(next_bin_index, i);
+          break;
+        }
+      }
+      #pragma omp barrier
+      #pragma omp single nowait
+      {
+		#if PRINT_INFO
+	        t.Stop();
+	        PrintStep(curr_bin_index, t.Millisecs(), curr_frontier_tail);
+	        t.Start();
+		#endif
+        curr_bin_index = kDistInf;
+        curr_frontier_tail = 0;
+      }
+      if (next_bin_index < local_bins.size()) {
+        size_t copy_start = fetch_and_add(next_frontier_tail,
+                                          local_bins[next_bin_index].size());
+        copy(local_bins[next_bin_index].begin(),
+             local_bins[next_bin_index].end(), frontier.data() + copy_start);
+        local_bins[next_bin_index].resize(0);
+      }
+      iter++;
+      #pragma omp barrier
+    }
+	#if PRINT_INFO
+    	#pragma omp single
+    	cout << "took " << iter << " iterations" << endl;
+	#endif
+  }
+  return dist;
+}
+
+
+void PrintSSSPStats(const My_Weighted_Graph &g, const pvector<WeightT> &dist) {
+  auto NotInf = [](WeightT d) { return d != kDistInf; };
+  int64_t num_reached = count_if(dist.begin(), dist.end(), NotInf);
+  cout << "SSSP Tree reaches " << num_reached << " nodes" << endl;
+}
+
+
+// Compares against simple serial implementation
+bool SSSPVerifier(const My_Weighted_Graph &g, NodeId source,
+                  const pvector<WeightT> &dist_to_test) {
+  // Serial Dijkstra implementation to get oracle distances
+  pvector<WeightT> oracle_dist(g.num_nodes(), kDistInf);
+  oracle_dist[source] = 0;
+  typedef pair<WeightT, NodeId> WN;
+  priority_queue<WN, vector<WN>, greater<WN>> mq;
+  mq.push(make_pair(0, source));
+  while (!mq.empty()) {
+    WeightT td = mq.top().first;
+    NodeId u = mq.top().second;
+    mq.pop();
+    if (td == oracle_dist[u]) {
+      for (Neighbour wn : g.out_neigh(u)) {
+        if (td + wn.weight < oracle_dist[wn.id]) {
+          oracle_dist[wn.id] = td + wn.weight;
+          mq.push(make_pair(td + wn.weight, wn.id));
+        }
+      }
+    }
+  }
+  // Report any mismatches
+  bool all_ok = true;
+  for (NodeId n : g.vertices()) {
+    if (dist_to_test[n] != oracle_dist[n]) {
+      cout << n << ": " << dist_to_test[n] << " != " << oracle_dist[n] << endl;
+      all_ok = false;
+    }
+  }
+  return all_ok;
+}
+
+
+int main(int argc, char* argv[]) {
+  CLDelta cli(argc, argv, "single-source shortest-path");
+  if (!cli.ParseArgs())
+    return -1;
+  WeightedBuilder b(cli);
+  My_Weighted_Graph g = b.make_weighted_graph_from_CSR();
+
+  SourcePicker<My_Weighted_Graph> sp(g, cli.start_vertex());
+  auto SSSPBound = [&sp, &cli] (const My_Weighted_Graph &g) {
+    return DeltaStep(g, sp.PickNext(), cli.delta());
+  };
+  SourcePicker<My_Weighted_Graph> vsp(g, cli.start_vertex());
+  auto VerifierBound = [&vsp] (const My_Weighted_Graph &g, const pvector<WeightT> &dist) {
+    return SSSPVerifier(g, vsp.PickNext(), dist);
+  };
+  BenchmarkKernelLegacy(cli, g, SSSPBound, PrintSSSPStats, VerifierBound);
+  return 0;
+}

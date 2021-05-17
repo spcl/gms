@@ -1,0 +1,132 @@
+// This is an example configuration file
+// This is a json file, but comments (marked with //) are allowed
+// and are properly processed in scriptmaker.py.
+//
+// The top level object requires 4 entries:
+//  1. common_parameter_values: Object with parameter values that should
+//     be shared between the different algorithms
+//  2. algorithms: Object with one object per algorithm to call
+//  3. batch_system: Name the batch system. Currently only "slurm" is supported
+//  4. slurm: Object to configure the slurm-batch-jobs
+//
+//  NOTE:   <<<------------------
+//  Any added paths will always be relative to the created masterscript
+//  (which by default will be placed in a rs_[timestamp] directory)
+//
+//  common_parameter_values is structured like algorithms/parameters_values
+//  algorithm:
+//    Contains 2 Objects and 1 (3) variables:
+//      executable: variable, path to executable
+//      ignore: variable, optional (default="false"). Set to "true" to ignore this
+//               algorithm in the current configuration
+//      parameters_type: variable (optional, can be inferred from parameters_location)
+//                       either "named", "positional" or "none"
+//      parameters_location: Object, each variable insided specifies the location of
+//               a parameter. Either positional (1, 2, 3,...) or named ("-g", "--graph=").
+//               To set a parameter-tandem, put all their names seperated by a space as the key
+//               and list the positions in a list.
+//      parameters_values: Ojbect, each variable or list specifies the range of values for
+//               the respective parameter. Single values are listed as is, a range 
+//               is specified by start:stop:incr (default incr=1).
+//               Example: "threads":["1", "2", "4:12:4", "13"] unpacks to
+//               [1, 2, 4, 8, 12, 13] (works with floats as well,)
+//               Missing values for parameters specified in parameters_location are looked
+//               up in common_parameter_values. Values inside parameter_values overwrtie
+//               values in common_parameter_values for this algorithm.
+//               For parameter-tandems, put all the parameter names seperated by a space as key
+//               and list the values in nested lists. Example:
+//               position: "graphs threads":["-g", "-p"]
+//               values: "graphs threads":[["g1", 5], ["g2", 8]].
+//               This will restrict the combinations to the explicitly named. For tandems,
+//               values must be listed and missing values cannot be retrieved from
+//               common_parameter_values.
+//  slurm: Object, currently only contains an "sbatch" object.
+//               Inside sbatch place slurm-directives that should be added to the scripts
+//               Example: "time":"00:02:00" unpacks to
+//               #SBATCH --time=00:02:00
+{
+    "common_parameter_values":{
+        "threads":["1", "5:15:5"],
+        "graphs": ["path/to/graph1", "path/to/graph2"]
+    },
+    "algorithms":[
+        {
+            "executable": "testcase1",
+            "parameters_type" : "named",
+            "parameters_location":{
+                "threads":"-p",
+                "kcliques":"-k",
+                "graphs":"-f"
+            },
+            "parameters_values":{
+                "kcliques":"4:8:4"
+            }
+        },
+        {
+            "executable":"testcase2",
+            "parameters_type" : "positional",
+            "parameters_location":{
+                "graphs":2,
+                "threads":1
+            },
+            "parameters_values":{
+
+            }
+        },
+        {
+            "executable":"testcase3",
+            "parameters_location":{
+                "graphs":1,
+                "threads":2
+            },
+            "parameters_values":{
+                "threads":["1", "2"]
+            }
+        },
+        {
+            "executable":"testcase4",
+            "ignore":"true",
+            "parameters_location":{
+                "graphs":"-f",
+                "threads":"-t"
+            },
+            "parameters_values":{}
+        },
+        {
+            "executable":"testcase5",
+            "parameters_location":{
+                "graphs":"-g",
+                "threads":"-t",
+                "dval":"-d"
+            },
+            "parameters_values":{
+                "dval":[1.23, "5.5:6.6:0.5"]
+            }
+        },
+        {
+            "executable":"testcase6",
+            "parameters_location":{
+                "graphs pattern":["-g", "-p"],
+                "threads":"-t"
+            },
+            "parameters_values":{
+                "graphs pattern":[["path/to/graph1", "pattern1"],
+                    ["path/to/graph2", "pattern2"]]
+            }
+        }
+
+    ],
+    "batch_system": "slurm",
+    "slurm":{
+        "sbatch":{
+            "mail-type":"all",
+            "ntasks-per-core":1,
+            "time":"00:02:00"
+        }
+    },
+    "lsf":{
+        "bsub":{
+            "W":"00:02:00"
+        }
+    }
+}

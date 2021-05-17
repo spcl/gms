@@ -1,0 +1,1 @@
+add_library(roaring roaring/roaring.c)

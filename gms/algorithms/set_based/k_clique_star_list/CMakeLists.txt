@@ -1,0 +1,1 @@
+gms_benchmark(k_clique_star_list.cc)

@@ -1,0 +1,5 @@
+add_subdirectory(k_clique_count)
+add_subdirectory(k_clique_star_list)
+add_subdirectory(maximal_clique_enum)
+add_subdirectory(triangle_count)
+add_subdirectory(link_prediction)

@@ -1,0 +1,21 @@
+why we put the implementation into the header files
+http://stackoverflow.com/questions/453372/writing-function-definition-in-header-files-in-c
+-> There actually seems to be a bit of improvement :)
+(0.00707 for -g 18)
+
+branch prediction optimization for next()
+- the common case should be in the if block
+http://stackoverflow.com/questions/3702903/portable-branch-prediction-hints#3702965
+-> No (or very slight) improvement unfortunately (0.00709 for -g 18)
+
+
+New observation: The speed matches the original implementation if we have k = 32
+
+some measurements for -g 18 -n 1 -v:
+    without parallelism:
+        about 0.017 for kbit_bfs, about 0.013 for bfs
+    with parallelism:
+        about 0.0073 for kbit_bfs, about 0.0053
+
+
+Lets try software prefetching:

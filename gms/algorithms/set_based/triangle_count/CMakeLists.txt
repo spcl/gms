@@ -1,0 +1,1 @@
+gms_benchmark(triangle_count.cc)

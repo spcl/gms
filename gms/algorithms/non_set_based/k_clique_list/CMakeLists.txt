@@ -1,0 +1,3 @@
+gms_benchmark(k_clique_list_danisch_edge_parallel.cc)
+gms_benchmark(k_clique_list_danisch_node_parallel.cc)
+gms_benchmark(k_clique_list_danisch_serial.cc)

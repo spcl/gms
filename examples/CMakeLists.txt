@@ -1,0 +1,2 @@
+add_executable(triangle_counting_example triangle_counting.cpp)
+target_link_libraries(triangle_counting_example)

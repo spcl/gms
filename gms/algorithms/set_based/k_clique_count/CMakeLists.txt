@@ -1,0 +1,1 @@
+gms_benchmark(k_clique_count_set_based.cc)
