@@ -756,6 +756,9 @@ VarintWordBasedGraph csrToVarintWordBased(const CSRGraphBase<NodeId_, DestID_, i
 		return VarintWordBasedGraph(num_nodes, num_edges, directed, new_offsets_out, new_offsets_in, new_adj_data_out, new_adj_data_in);
 	}
 
+//Ignore Compiler-Warning of 3rd party Code (GMS team)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpessimizing-move"
 	template <class CGraph>
 	auto csrToCGraphGeneric(const CSRGraphBase<NodeId_, DestID_, invert> &csr_graph) {
         if constexpr (std::is_same_v<CGraph, CSRGraph>) {
@@ -780,7 +783,7 @@ VarintWordBasedGraph csrToVarintWordBased(const CSRGraphBase<NodeId_, DestID_, i
             static_assert(GMS::always_false<CGraph>, "class not supported");
         }
     }
-
+#pragma GCC diagnostic pop
 
 struct Tree {
 	Tree* left = 0; // left subtree
