@@ -205,7 +205,7 @@ public:
 
             #pragma omp for schedule(dynamic,8)
             for (NodeId v = 0; v < n; v++) {
-    	        NodeId lastU = 0;
+    	        [[maybe_unused]] NodeId lastU = 0;
 
                 if(g.out_degree(v)>=friendNumber) {
                     auto N = g.out_neigh(v);

@@ -34,7 +34,11 @@ CGraph load_CGraph(int)
 
     // TODO refactoring
     if constexpr (std::is_same_v<CGraph, CSRGraph>) {
+//Ignore Compiler-Warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpessimizing-move"
         return std::move(g);
+#pragma GCC diagnostic pop
     } else {
         return builder.csrToCGraphGeneric<CGraph>(g);
     }

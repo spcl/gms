@@ -27,14 +27,14 @@ public:
         int neighCount = subg.cardinality();
         this->mapping.reserve(neighCount);
         int counter = 0;
-        for (auto const w : cand)
+        for (NodeId const w : cand)
         {
             this->mapping.insert({w, counter});
             this->vertices[counter] = graph.out_neigh(w).intersect(subg);
             this->backReferences[counter] = {this->vertices[counter].intersect_count(cand), w};
             counter++;
         }
-        for (auto const w : fini)
+        for (NodeId const w : fini)
         {
             this->mapping.insert({w, counter});
             this->vertices[counter] = graph.out_neigh(w).intersect(cand);
@@ -49,14 +49,14 @@ public:
         int neighCount = subg.cardinality();
         this->mapping.reserve(neighCount);
         int counter = 0;
-        for (auto const w : cand)
+        for (NodeId const w : cand)
         {
             this->mapping.insert({w, counter});
             this->vertices[counter] = graph.neigh(w).intersect(subg);
             this->backReferences[counter] = {this->vertices[counter].intersect_count(cand), w};
             counter++;
         }
-        for (auto const w : fini)
+        for (NodeId const w : fini)
         {
             this->mapping.insert({w, counter});
             this->vertices[counter] = graph.neigh(w).intersect(cand);

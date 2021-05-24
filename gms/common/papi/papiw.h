@@ -3,6 +3,8 @@
 
 #include "./papiw_util.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 /**
  * Papi Wrapper Highlevel Module
  * 
@@ -126,6 +128,7 @@ namespace PAPIW
 #endif
         }
 } // namespace PAPIW
+#pragma GCC diagnostic pop
 
 #ifdef NOPAPIW
 /* Provide PAPI Counter Macros, s.t. a program with deactivated PAPIW compiles nevertheless */

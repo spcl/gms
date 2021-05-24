@@ -1244,11 +1244,15 @@ private:
             return *this;
         }
 
+//Ignore Compiler-Warning of 3rd party Code (GMS team)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpessimizing-move"
         Iter operator++(int) noexcept {
             Iter tmp = *this;
             ++(*this);
             return std::move(tmp);
         }
+#pragma GCC diagnostic pop
 
         reference operator*() const {
             return **mKeyVals;
